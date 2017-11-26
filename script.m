@@ -15,6 +15,7 @@ intensity = load('intensidad_RGB.mat');
 % Las señales.
 printf('Cargando las señales.\n')
 rgb = intensity.brillo;
+%rgb = intensity.intensidad(1:2200, :);
 redSignal = rgb(:, 1);
 greenSignal = rgb(:, 2);
 blueSignal = rgb(:, 3);
@@ -53,7 +54,7 @@ title('Intensidad por color.')
 print -dpng 'images/ej1/superposicion.png';
 
 % Elijo una señal para el resto de los items.
-signal = redSignal;
+signal = greenSignal;
 
 
 
@@ -161,7 +162,7 @@ function plotDFTWithXlims (hertzAxis, dft, xlims)
 
 	subplot(2, 1, 2);
 	argument = arg(dft);
-	plot(hertzAxis, unwrap(argument));
+	plot(hertzAxis, argument);
 	xlabel('Frecuencia [Hz]');
 	ylabel('Fase de la DFT');
 
@@ -227,10 +228,10 @@ function [bButter aButter] = Butterworth (filterOrder, samplingPeriod, N, timeAx
 		title('Respuesta en frecuencia');
 
 		subplot(2, 1, 2);
-		plot(OmegaButter, unwrap(phase));
+		plot(OmegaButter, phase);
 		set(gca, 'xminorgrid', 'on');
 		% Limito a la parte que me interesa
-		xlim([lowDiscreteFrequency/pi highDiscreteFrequency/pi]);
+		%xlim([lowDiscreteFrequency/pi highDiscreteFrequency/pi]);
 		xlabel('Frecuencia normalizada');
 		ylabel('Fase');
 
@@ -271,8 +272,8 @@ endfunction
 %
 Butterworth(2, samplingPeriod, N, timeAxis, true);
 Butterworth(4, samplingPeriod, N, timeAxis, true);
-[bButter aButter] = Butterworth(6, samplingPeriod, N, timeAxis, true);
-Butterworth(10, samplingPeriod, N, timeAxis, true);
+Butterworth(6, samplingPeriod, N, timeAxis, true);
+[bButter aButter] = Butterworth(10, samplingPeriod, N, timeAxis, true);
 
 
 
@@ -299,13 +300,14 @@ plot(timeAxis, signal, 'r');
 hold on;
 
 % Dibujo la señal filtrada con el Butterworth:
-%	Se ve que desaparece la señal de frecuencia baja (sobre la que
+%	a. Se ve que desaparece la señal de frecuencia baja (sobre la que
 %	parece montada la señal original), y que desaparecen los picos
 %	más bruscos, ya que se están filtrando las frecuencias altas.
-%	Pero también se observa una deformación de la señal, dada por
+%	b. Pero también se observa una deformación de la señal, dada por
 %	lo mucho que varía la fase.
+%	c. Se ve una diferencia de fases de 4 muestras.
 %
-plot(timeAxis, butterworthFilteredSignal, 'g');
+plot(timeAxis, -butterworthFilteredSignal, 'g');
 xlabel('Tiempo [s]');
 ylabel('Respuesta al filtro');
 grid on;
@@ -314,7 +316,20 @@ title('Señal filtrada con un Butterworth');
 legend('Señal original', 'Señal filtrada');
 print -dpng 'images/ej5/superposicion.png';
 
-% TODO: Agregar los comentarios de a,b,c
+figure;
+plot(signal, 'r');
+hold on;
+plot(-butterworthFilteredSignal, 'g');
+xlabel('Número de muestra');
+ylabel('Respuesta al filtro');
+grid on;
+set(gca, 'xminorgrid', 'on');
+title('Señal filtrada con un Butterworth');
+legend('Señal original', 'Señal filtrada');
+ylim([-0.05 0.05]);
+xlim([1690 1710]);
+
+print -dpng 'images/ej5/zoom.png';
 
 
 
@@ -323,9 +338,27 @@ print -dpng 'images/ej5/superposicion.png';
 %% 6. A partir de la respuesta en fase del filtro, calcule su retardo temporal 
 % y compare con lo observado en el punto 5c.
 %
+% En la figura se ve que para las frecuencias altas, la fase es de aproximadamente
+% unas cuatro muestras, lo que se condice con lo observado en el punto 5-c, ya que
+% para estimar ese valor se habían comparado las posiciones de los picos
+%
 printf('\nEjercicio 6:\n');
 
-% TODO...
+[HButter, OmegaButter] = freqz(bButter, aButter);
+phase = arg(HButter);
+drift = (phase(3:end) - phase(1:end-2)) ./ (OmegaButter(3) - OmegaButter(1));
+OmegaButter = OmegaButter(2:end-1);
+
+figure;
+plot(OmegaButter/pi, -drift);
+xlabel('Frecuencia normalizada [pi x rad/s]');
+ylabel('Retardo de grupo [muestras]');
+grid on;
+set(gca, 'xminorgrid', 'on');
+title('Retardo temporal');
+ylim([0 5]);
+
+print -dpng 'images/ej6/derivada.png';
 
 
 
@@ -374,30 +407,33 @@ printf('\nEjercicio 8:\n');
 function generateSpectrograms (signal, iirFilteredSignal, samplingPeriod, specgramWindow, windowWidth)
 	figure;
 	subplot(2, 1, 1);
-	specgram(signal, windowWidth, 1/samplingPeriod, specgramWindow, round(windowWidth/2));
+	specgram(signal, windowWidth, 1/samplingPeriod, specgramWindow, round(3*windowWidth/4));
 	ylim([0 4]);
 	colormap('jet');
+	xlim([0 80]);
+	%caxis([-25 20]);
+	caxis([-25 3]);
 	colorbar();
-	colors = caxis();
 	title('Señal original');
 
 	subplot(2, 1, 2);
-	specgram(iirFilteredSignal, windowWidth, 1/samplingPeriod, specgramWindow, round(windowWidth/2));
+	specgram(iirFilteredSignal, windowWidth, 1/samplingPeriod, specgramWindow, round(3*windowWidth/4));
 	ylim([0 4]);
+	xlim([0 80]);
 	colormap('jet');
 	colorbar();
-	caxis(colors);
+	%caxis([-25 15]);
+	caxis([-25 3]);
 	title('Señal filtrada');
 endfunction
 
-% Muestro DFT de la señal filtrada: Se ve que los picos terminan antes de los 3.5Hz
+% Muestro DFT de la señal filtrada
 dftFiltered = fftshift(fft(iirFilteredSignal));
 plotDFT(hertzAxis, dftFiltered);
 print -dpng 'images/ej8/dftfiltrada.png';
 
 % Calculo el ancho de la ventana a partir de lo observado en la DFT
-hertzStep = diff(hertzAxis)(1);
-windowWidth = ceil(3.5/hertzStep);
+windowWidth = ceil((1+2/0.4)/samplingPeriod);
 printf('Calculo el ancho de la ventana a partir de lo observado en la DFT: %d.\n', windowWidth);
 
 % En el espectrograma se ve mucho ruido al principio, y luego una frecuencia creciente
@@ -435,9 +471,8 @@ print -dpng 'images/ej8/hamming.png';
 printf('\nEjercicio 9:\n');
 
 % Las observaciones del espectrograma están en el ejercicio anterior. La frecuencia
-% que ronda 1Hz debería ser la relacionada con el pulso cardíaco, la otra entonces
-% debería estar relacionada con la señal de audio...
-% TODO: Entender cómo es que se relaciona con esa otra señal.
+% que ronda 1Hz debería ser la relacionada con el pulso cardíaco, y la de 2~3Hz es
+% un armónico, la otra entonces debería estar relacionada con la señal de audio...
 
 % Cargo la señal de audio
 printf('Cargando señal de audio.\n');
@@ -450,6 +485,9 @@ audioTimeAxis = [0 : audioSamplingPeriod : audioSamplingPeriod * (audioN - 1)];
 % Normalizo
 audio = audio / max(audio);
 
+[bButterAudio aButterAudio] = Butterworth(10, audioSamplingPeriod, audioN, audioTimeAxis, false);
+audioFilteredSignal = filtfilt(bButterAudio, aButterAudio, audio);
+
 figure;
 plot(audioTimeAxis, audio);
 xlabel('Tiempo [s]');
@@ -457,8 +495,10 @@ ylabel('Intensidad de audio');
 print -dpng 'images/ej9/audio.png';
 
 figure;
-specgram(audio);
-colormap('jet');
+
+audioWindowWidth = ceil(5*1.2/audioSamplingPeriod);
+audioSpecgramWindow = window(@hamming, audioWindowWidth);
+generateSpectrograms(audio, audioFilteredSignal, audioSamplingPeriod, audioSpecgramWindow, audioWindowWidth);
 print -dpng 'images/ej9/audioespectrograma.png';
 
 audioDFT = fftshift(fft(audio));
@@ -578,23 +618,30 @@ function pulseXs = findPulses (firstI, lastI, umbral, normalizedFilteredSignal, 
 endfunction
 
 
+function outputSignal = myFilter (filterImpulseResponse, inputSignal)
+	outputSignal = conv(filterImpulseResponse, inputSignal);
+	outputSignal = outputSignal(floor(length(filterImpulseResponse)/2):end-ceil(length(filterImpulseResponse)/2));
+endfunction
+
+
 function signalPeaksTimes = detectPulses (signal, samplingPeriod, timeAxis)
 	N = length(signal);
 
 	% a. Filtrado pasa-banda de la señal, utilizando el filtrado del ejercicio 7.
-	[bButter aButter] = Butterworth (6, samplingPeriod, N, timeAxis, false);
+	[bButter aButter] = Butterworth (10, samplingPeriod, N, timeAxis, false);
 	iirFilteredSignal = filtfilt(bButter, aButter, signal);
 
 	% b. Filtro de derivada, implementado con un filtro FIR h(n)=[-2 -1 0 1 2].
 	hDriftRemoval = [-2 -1 0 1 2];
-	filteredSignal = filter(hDriftRemoval, [1], iirFilteredSignal);
+	filteredSignal = myFilter(hDriftRemoval, iirFilteredSignal);
 
 	% c. Normalización con energía instantánea:
 
 	% * Primero calcular la energía instantánea de la señal mediante un filtro MA 1
 	% de la señal del punto 10a elevada al cuadrado
-	maFilter = ones(N, 1) / N;
-	energy = filter(maFilter, [1], iirFilteredSignal.^2);
+	maN = ceil(4/samplingPeriod);
+	maFilter = ones(maN, 1) / maN;
+	energy = myFilter(maFilter, iirFilteredSignal.^2);
 
 	% luego dividir la señal del punto b por el vector obtenido.
 	% Esto tiene como objeto reducir el impacto de la presión sanguínea sobre el
@@ -605,40 +652,42 @@ function signalPeaksTimes = detectPulses (signal, samplingPeriod, timeAxis)
 	% d. Sobre-muestreo en un factor 4 para obtener mayor resolución temporal:
 	% implemente el sobre-muestreo utilizando la función upsample y diseñe un
 	% filtro interpolador FIR utilizando la herramienta fdatool de Matlab.
-	filteredSignal = upsample(filteredSignal, 4);
-	hInterpolator = [0.25 0.50 0.75 1.00 0.75 0.50 0.25];
-	interpolatedSignal = filter(hInterpolator, [1], filteredSignal);
-	normalizedFilteredSignal = interpolatedSignal/max(interpolatedSignal);
+	upsampledSignal = upsample(filteredSignal, 4);
+	
+	% Uso una sinc de 25 puntos
+	hInterpolator = fir1(24, 1/4, 'low')/(1/4);
 
-	upsampledTimeAxis = upsample(timeAxis, 4);
-	upsampledTimeAxis = filter(hInterpolator, [1], upsampledTimeAxis);
+	interpolatedSignal = myFilter(hInterpolator, upsampledSignal);
+	normalizedFilteredSignal = interpolatedSignal / max(interpolatedSignal);
+	upsampledTimeAxis = [0:samplingPeriod/4:(samplingPeriod) * (N-1/4)];
+
+	figure;
+	plot(upsampledTimeAxis, interpolatedSignal);
+	hold on;
+	stem(timeAxis, filteredSignal);
+	title('Interpolacion');
+	legend('Señal interpolada', 'Señal original');
+	xlabel('Tiempo [s]');
+	ylabel('Intensidad');
+	xlim([55 60]);
+	ylim([-10 10]);
+	print -dpng 'images/ej10/interpolacion.png';
 
 	% Grafique: respuesta en frecuencia del filtro en módulo y fase, y señal original
 	% y sobre-muestreada en superposición.
 	figure;
-	impz(hInterpolator, [1]);
+	stem(timeAxis(1:length(hInterpolator)), hInterpolator);
 	grid on;
 	set(gca, 'xminorgrid', 'on');
 	title('Respuesta al impulso');
+	xlabel('Tiempo[s]');
 	print -dpng 'images/ej10/impz.png';
 
 	figure;
 	freqz(hInterpolator, [1]);
 	print -dpng 'images/ej10/freqz.png';
 
-	figure;
-	plot(timeAxis, signal);
-	hold on;
-	plot(upsampledTimeAxis, normalizedFilteredSignal);
-
-	xlabel('Tiempo [s]');
-	ylabel('Intensidad');
-	xlim([1 xlim()(2)]);
-	ylim([-0.5 0.5]);
-	grid on;
-	legend('Señal', 'Señal filtrada');
-
-	print -dpng 'images/ej10/superposicion.png';
+	% superposicion se plotea en el item siguiente
 
 	% e. Detector de picos mediante umbral (puede definir como umbral un valor
 	% arbitrario)
@@ -658,6 +707,16 @@ function signalPeaksTimes = detectPulses (signal, samplingPeriod, timeAxis)
 	signalPeaksTimes = upsampledTimeAxis(signalPeakXs);
 	signalPeaksValues = normalizedFilteredSignal(signalPeakXs);
 
+	figure;
+	plot(timeAxis, signal);
+	hold on;
+	plot(upsampledTimeAxis, normalizedFilteredSignal*median(signal(ceil(signalPeakXs/4))));
+	xlabel('Tiempo [s]');
+	ylabel('Intensidad');
+	grid on;
+	legend('Señal', 'Señal filtrada');
+	print -dpng 'images/ej10/superposicion.png';
+
 	% f. Gráfico en superposición de la señal con las marcas de los picos detectados.
 	figure;
 	plot(upsampledTimeAxis, normalizedFilteredSignal);
@@ -666,8 +725,9 @@ function signalPeaksTimes = detectPulses (signal, samplingPeriod, timeAxis)
 
 	xlabel('Tiempo [s]');
 	ylabel('Intensidad');
-	xlim([1 xlim()(2)]);
-	ylim([-0.5 0.5]);
+	ylim([-2 2]);
+	xlim([64 74]);
+	grid on;
 	legend('Señal filtrada', 'Picos');
 	print -dpng 'images/ej10/picos.png';
 
